@@ -50,22 +50,25 @@ All internal VPC traffic, such as Bastion connecting to RDS, uses the local rout
 
 The entire flow can be visualized as follows:
 
-[Your Laptop/PC]
-|
-| SSH 22
-v
-[Internet Gateway (IGW)]
-|
-v
-[Public Subnet Route Table] → [Bastion Host (10.0.1.x)]
-|
-| TCP 5432 (PostgreSQL)
-v
-[Private Subnet Route Table] → [RDS Database (10.0.2.x / 10.0.3.x)]
-|
-| (Optional outbound)
-v
-[NAT Gateway in Public Subnet] → [Internet via IGW]
+```  
+[Your Laptop/PC]  
+|  
+| SSH 22  
+v  
+[Internet Gateway (IGW)]  
+|  
+v  
+[Public Subnet Route Table] → [Bastion Host (10.0.1.x)]  
+|  
+| TCP 5432 (PostgreSQL)  
+v  
+[Private Subnet Route Table] → [RDS Database (10.0.2.x / 10.0.3.x)]  
+|  
+| (Optional outbound)  
+v  
+[NAT Gateway in Public Subnet] → [Internet via IGW]  
+```
+
 
 
 In summary, the project architecture ensures that the Bastion host serves as the only entry point from the internet, while the RDS database remains in isolated private subnets with controlled access. Route tables, security groups, NACLs, and gateways work together to direct traffic appropriately, enforce security, and maintain the ability for private instances to communicate both internally and with the internet when necessary, achieving a balance of accessibility, isolation, and high availability.
