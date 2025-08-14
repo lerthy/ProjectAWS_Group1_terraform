@@ -6,7 +6,7 @@ This project deploys a secure Amazon RDS (PostgreSQL) instance using Terraform w
 
 ## Architecture
 
-![AWS Infrastructure Architecture](./images/arch_final.png)
+![AWS Infrastructure Architecture](./images/final1.png)
 
 *Figure: AWS RDS Infrastructure with Bastion Host Architecture*
 
