@@ -99,8 +99,7 @@ ssh -i /path/to/your-key.pem ec2-user@<bastion-public-ip>
 
 ### 2. Install PostgreSQL Client (on Bastion)
 ```bash
-sudo yum update -y
-sudo yum install postgresql15 -y
+sudo dnf install -y postgresql15-server postgresql15
 ```
 
 ### 3. Connect to RDS
