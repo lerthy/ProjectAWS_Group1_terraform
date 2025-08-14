@@ -51,20 +51,20 @@ All internal VPC traffic, such as Bastion connecting to RDS, uses the local rout
 The entire flow can be visualized as follows:
 
 [Your Laptop/PC]
-      |
-      | SSH 22
-      v
+|
+| SSH 22
+v
 [Internet Gateway (IGW)]
-      |
-      v
+|
+v
 [Public Subnet Route Table] → [Bastion Host (10.0.1.x)]
-      |
-      | TCP 5432 (PostgreSQL)
-      v
+|
+| TCP 5432 (PostgreSQL)
+v
 [Private Subnet Route Table] → [RDS Database (10.0.2.x / 10.0.3.x)]
-      |
-      | (Optional outbound)
-      v
+|
+| (Optional outbound)
+v
 [NAT Gateway in Public Subnet] → [Internet via IGW]
 
 
