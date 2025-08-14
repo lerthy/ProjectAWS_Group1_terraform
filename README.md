@@ -40,6 +40,154 @@ This project deploys a secure Amazon RDS (PostgreSQL) instance using Terraform w
 - **No Hardcoded Secrets**: Sensitive values managed through variables
 - **Skip Snapshot**: Configured for development (adjust for production)
 
+
+Complete Traffic Flow in the Project
+1. Overview of Components
+
+Here’s what our network contains:
+
+Component         	                                Purpose
+
+VPC (10.0.0.0/16)                 -	Private network container for all resources
+Public Subnet (10.0.1.0/24) 	    - Hosts Bastion host & NAT Gateway; has Internet Gateway route
+Private Subnet A (10.0.2.0/24)	  - Hosts RDS DB (multi-AZ setup, part A)
+Private Subnet B (10.0.3.0/24)	  - Hosts RDS DB (multi-AZ setup, part B)
+Internet Gateway (IGW)	          - Provides public internet access for public subnet resources
+NAT Gateway	                      - Allows private subnet resources to access the internet outbound
+Route Tables	                    - Controls routing of traffic for public and private subnets
+Network ACLs (NACLs)	            - Additional subnet-level firewall rules for inbound/outbound traffic
+Security Groups (SGs)	            - Instance-level firewalls controlling inbound/outbound traffic
+Bastion Host	                    - Public-facing jump server to access private resources (RDS)
+RDS (PostgreSQL)	                - Private database, accessible only from Bastion host
+
+2. Traffic Flow Details
+Step 1 — External Access to Bastion Host
+
+Source: Your local laptop or workstation.
+
+Destination: Bastion host in public subnet (10.0.1.0/24).
+
+Route Table: Public route table
+
+10.0.0.0/16 → local
+0.0.0.0/0 → Internet Gateway
+
+
+IGW Role: Provides public internet connectivity for inbound SSH and outbound responses.
+
+Security Group (Bastion SG):
+Allows inbound TCP 22 (SSH) only from your IP (var.allowed_ssh_ip).
+Allows all outbound traffic to any destination (0.0.0.0/0).
+
+NACL (Public NACL):
+Allows inbound SSH (22) from any IP.
+Allows ephemeral ports (1024–65535) inbound.
+Allows all outbound traffic.
+
+Result: You can securely SSH into Bastion from your own IP. Internet cannot access private subnets.
+
+Step 2 — Bastion Accesses Private RDS
+
+Source: Bastion host (public subnet).
+Destination: RDS instance in private subnet A/B (10.0.2.0/24 & 10.0.3.0/24).
+
+Route Table (Private Subnet):
+10.0.0.0/16 → local  # Internal VPC traffic
+0.0.0.0/0 → NAT Gateway  # For outbound internet (optional)
+
+
+Security Group (RDS SG):
+Allows inbound TCP 5432 (PostgreSQL) only from Bastion SG.
+Outbound: all traffic (0.0.0.0/0) allowed.
+
+NACL (Private NACL):
+Inbound rules:
+SSH 22 from public subnet (10.0.1.0/24)
+PostgreSQL 5432 from public subnet
+Ephemeral ports (1024–65535) inbound
+Outbound rules: allow all
+
+Route Table + SGs ensure:
+Only Bastion can access RDS.
+Internet cannot access RDS directly.
+
+Result: Bastion acts as a secure “jump server” to connect to the private RDS DB.
+
+Step 3 — Private Subnet Outbound Internet (Optional)
+
+Source: RDS or any other instance in private subnet.
+Route Table: Private route table
+0.0.0.0/0 → NAT Gateway
+
+
+NAT Gateway Location: Public subnet (10.0.1.0/24) with Elastic IP.
+
+IGW Role: NAT uses IGW to reach internet.
+
+Security Rules:
+Outbound traffic allowed by RDS SG & private NACL.
+Inbound traffic from internet blocked (stateless NAT only allows responses).
+Example:
+RDS downloads security updates or connects to AWS services via public endpoints.
+Internet cannot initiate a connection to RDS.
+
+Step 4 — Internal VPC Traffic
+
+All internal traffic within 10.0.0.0/16 routes through local route.
+Security groups + NACLs enforce rules.
+Examples:
+Bastion → RDS (port 5432) ✅ allowed
+Bastion → anything else in private subnet ✅ allowed if SG/NACL permit
+Public EC2 → Private EC2 (not in your project) ❌ blocked if SG/NACL disallow
+
+Step 5 — Multi-AZ RDS Redundancy
+
+RDS spans Private Subnet A + B for high availability.
+AWS automatically handles replication between AZs internally.
+Traffic for replication is inside VPC (local route) — doesn’t go to NAT or IGW.
+
+3. Security Controls Summary
+Resource	Controls	Direction
+Bastion SG	Inbound 22 from your IP; Outbound all	Inbound/Outbound
+RDS SG	Inbound 5432 from Bastion SG; Outbound all	Inbound/Outbound
+Public NACL	Inbound 22 + ephemeral, outbound all	Subnet-level
+Private NACL	Inbound 22/5432 from public subnet + ephemeral, outbound all	Subnet-level
+IGW	Public subnet → Internet	Both
+NAT Gateway	Private subnet → Internet	Outbound only
+4. Step-by-Step Access Example
+
+You SSH from laptop → Bastion (public IP via IGW).
+Bastion connects to RDS on port 5432 (private IP, VPC local routing).
+RDS can optionally reach internet via NAT Gateway (outbound only).
+NACLs and SGs block all other traffic to RDS from internet.
+
+5. Traffic Diagram (Text Version)
+[Your Laptop/PC]
+      |
+      | SSH 22
+      v
+[Internet Gateway (IGW)]
+      |
+      v
+[Public Subnet Route Table] → [Bastion Host (10.0.1.x)]
+      |
+      | TCP 5432 (PostgreSQL)
+      v
+[Private Subnet Route Table] → [RDS Database (10.0.2.x / 10.0.3.x)]
+      |
+      | (Optional outbound)
+      v
+[NAT Gateway in Public Subnet] → [Internet via IGW]
+
+
+
+
+Only Bastion host is publicly accessible.
+RDS is private and unreachable from internet.
+Security Groups + NACLs enforce strict inbound/outbound rules.
+Route tables + NAT + IGW ensure proper subnet isolation and controlled internet access.
+Multi-AZ RDS ensures high availability.
+
 ## Prerequisites
 
 1. **AWS CLI** configured with appropriate credentials
