@@ -59,5 +59,4 @@ module "rds" {
   private_subnet_ids = module.vpc.private_subnet_ids
   bastion_sg_id    = module.bastion.security_group_id
   db_username      = "dbadmin"
-  db_password      = "admin123!"
 }

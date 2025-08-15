@@ -10,6 +10,19 @@ This project deploys a secure Amazon RDS (PostgreSQL) instance using Terraform w
 
 *Figure: AWS RDS Infrastructure with Bastion Host Architecture*
 
+### Traffic Flow
+
+The infrastructure follows a secure, layered access pattern:
+
+1. **User Access**: SSH (port 22) from your IP → Internet Gateway → Bastion Host (public subnet)
+2. **Database Access**: Bastion Host → PostgreSQL (port 5432) → RDS Instance (private subnet)
+3. **Internet Access**: Private resources → NAT Gateway → Internet (outbound only)
+
+**Security Controls**:
+- Bastion SG: SSH access restricted to your IP only
+- RDS SG: Database access only from Bastion security group
+- No direct internet access to private subnets or RDS instance
+
 ### Components
 
 - **VPC**: Custom VPC with DNS support and hostnames
@@ -37,7 +50,8 @@ This project deploys a secure Amazon RDS (PostgreSQL) instance using Terraform w
 
 ### Data Protection
 - **Encryption**: Terraform state stored encrypted in S3
-- **No Hardcoded Secrets**: Sensitive values managed through variables
+- **AWS Secrets Manager**: Database passwords automatically generated and managed by AWS
+- **No Hardcoded Secrets**: No passwords stored in code or state files
 - **Skip Snapshot**: Configured for development (adjust for production)
 
 ## Prerequisites
@@ -64,10 +78,10 @@ allowed_ssh_ip        = "YOUR.IP.ADDRESS.HERE/32"  # Your public IP
 bastion_ami           = "ami-0e2c86481225d3c51"    # Amazon Linux 2
 bastion_instance_type = "t3.micro"
 key_name              = "your-key-pair-name"       # Your EC2 key pair
-db_username           = "admin"
-db_password           = "your-secure-password"
 s3_bucket_name        = "your-terraform-state-bucket"
 ```
+
+**Note**: Database credentials are automatically managed by AWS Secrets Manager - no need to specify passwords!
 
 ### 3. Initialize Terraform
 ```bash
@@ -92,6 +106,22 @@ terraform output
 
 ## Accessing the Database
 
+### Get Database Credentials
+Database credentials are automatically managed by AWS Secrets Manager. Retrieve them using:
+
+```bash
+# Get the secret ARN from Terraform output
+terraform output rds_master_user_secret_arn
+
+# Retrieve the credentials
+aws secretsmanager get-secret-value \
+  --secret-id <secret-arn> \
+  --query SecretString \
+  --output text
+```
+
+This returns a JSON object with `username` and `password` fields.
+
 ### 1. Connect to Bastion Host
 ```bash
 ssh -i /path/to/your-key.pem ec2-user@<bastion-public-ip>
@@ -105,7 +135,9 @@ sudo yum install postgresql15 -y
 
 ### 3. Connect to RDS
 ```bash
+# Use the credentials from Secrets Manager
 psql -h <rds-endpoint> -U <username> -d postgres
+# Enter the password from Secrets Manager when prompted
 ```
 
 ### Alternative: SSH Tunnel
@@ -193,13 +225,66 @@ aws ec2 describe-instances --filters "Name=tag:Name,Values=*bastion*"
 aws rds describe-db-instances --db-instance-identifier <project-name>-rds
 ```
 
+## AWS Secrets Manager Integration
+
+This infrastructure uses AWS Secrets Manager for secure database credential management:
+
+### Features
+- **Automatic Password Generation**: AWS generates secure, random passwords
+- **Encrypted Storage**: Credentials encrypted at rest and in transit
+- **Fine-grained Access Control**: Use IAM policies to control access
+- **Audit Trail**: All secret access logged in CloudTrail
+- **Rotation Support**: Optional automatic password rotation
+
+### Accessing Secrets Programmatically
+
+**Python Example:**
+```python
+import boto3
+import json
+
+def get_database_credentials():
+    client = boto3.client('secretsmanager', region_name='us-east-1')
+    response = client.get_secret_value(
+        SecretId='<your-secret-arn>'
+    )
+    secret = json.loads(response['SecretString'])
+    return secret['username'], secret['password']
+```
+
+**Node.js Example:**
+```javascript
+const AWS = require('aws-sdk');
+const secretsManager = new AWS.SecretsManager({region: 'us-east-1'});
+
+async function getDatabaseCredentials() {
+    const data = await secretsManager.getSecretValue({
+        SecretId: '<your-secret-arn>'
+    }).promise();
+    
+    const secret = JSON.parse(data.SecretString);
+    return {
+        username: secret.username,
+        password: secret.password
+    };
+}
+```
+
+### Optional: Enable Automatic Rotation
+```bash
+aws secretsmanager rotate-secret \
+    --secret-id '<your-secret-arn>' \
+    --rotation-rules AutomaticallyAfterDays=30
+```
+
 ## Production Considerations
 
 For production deployments, consider:
 
 - Enable RDS Multi-AZ deployment
 - Configure automated backups
-- Use AWS Secrets Manager for database credentials
+- ✅ **AWS Secrets Manager for database credentials** (already implemented)
+- Set up automatic password rotation
 - Implement monitoring and alerting
 - Add additional security layers (WAF, CloudTrail)
 - Use private subnets for Bastion host with VPN/Direct Connect

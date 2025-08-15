@@ -95,7 +95,7 @@ resource "aws_route_table_association" "private_assoc_b" {
 resource "aws_network_acl" "public_nacl" {
   vpc_id = aws_vpc.main.id
 
-  # Allow inbound SSH from allowed IP
+  # Allow inbound SSH from anywhere (security group will restrict)
   ingress {
     rule_no    = 100
     protocol   = "tcp"
@@ -105,28 +105,11 @@ resource "aws_network_acl" "public_nacl" {
     action     = "allow"
   }
 
-  # Allow inbound HTTP/HTTPS for updates
-  ingress {
-    rule_no    = 110
-    protocol   = "tcp"
-    from_port  = 80
-    to_port    = 80
-    cidr_block = "0.0.0.0/0"
-    action     = "allow"
-  }
 
-  ingress {
-    rule_no    = 120
-    protocol   = "tcp"
-    from_port  = 443
-    to_port    = 443
-    cidr_block = "0.0.0.0/0"
-    action     = "allow"
-  }
 
   # Allow ephemeral ports for responses
   ingress {
-    rule_no    = 130
+    rule_no    = 140
     protocol   = "tcp"
     from_port  = 1024
     to_port    = 65535
@@ -134,9 +117,39 @@ resource "aws_network_acl" "public_nacl" {
     action     = "allow"
   }
 
-  # Allow all outbound
+  # Allow outbound SSH responses 
   egress {
     rule_no    = 100
+    protocol   = "tcp"
+    from_port  = 22
+    to_port    = 22
+    cidr_block = "0.0.0.0/0"
+    action     = "allow"
+  }
+
+  # Allow outbound ICMP
+  egress {
+    rule_no    = 105
+    protocol   = "icmp"
+    from_port  = 0
+    to_port    = 0
+    cidr_block = "0.0.0.0/0"
+    action     = "allow"
+  }
+
+  # Allow outbound ephemeral ports for SSH and other responses
+  egress {
+    rule_no    = 110
+    protocol   = "tcp"
+    from_port  = 1024
+    to_port    = 65535
+    cidr_block = "0.0.0.0/0"
+    action     = "allow"
+  }
+
+  # Allow all other outbound traffic
+  egress {
+    rule_no    = 120
     protocol   = "-1"
     from_port  = 0
     to_port    = 0

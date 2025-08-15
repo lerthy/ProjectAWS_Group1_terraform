@@ -23,8 +23,8 @@ variable "db_username" {
   description = "Master username for the RDS PostgreSQL instance"
 }
 
-variable "db_password" {
+variable "kms_key_id" {
   type        = string
-  description = "Master password for the RDS PostgreSQL instance"
-  sensitive   = true
+  description = "KMS key ID for encrypting the master user secret (optional)"
+  default     = null
 }
