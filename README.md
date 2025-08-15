@@ -10,6 +10,19 @@ This project deploys a secure Amazon RDS (PostgreSQL) instance using Terraform w
 
 *Figure: AWS RDS Infrastructure with Bastion Host Architecture*
 
+### Traffic Flow
+
+The infrastructure follows a secure, layered access pattern:
+
+1. **User Access**: SSH (port 22) from your IP → Internet Gateway → Bastion Host (public subnet)
+2. **Database Access**: Bastion Host → PostgreSQL (port 5432) → RDS Instance (private subnet)
+3. **Internet Access**: Private resources → NAT Gateway → Internet (outbound only)
+
+**Security Controls**:
+- Bastion SG: SSH access restricted to your IP only
+- RDS SG: Database access only from Bastion security group
+- No direct internet access to private subnets or RDS instance
+
 ### Components
 
 - **VPC**: Custom VPC with DNS support and hostnames
@@ -39,40 +52,6 @@ This project deploys a secure Amazon RDS (PostgreSQL) instance using Terraform w
 - **Encryption**: Terraform state stored encrypted in S3
 - **No Hardcoded Secrets**: Sensitive values managed through variables
 - **Skip Snapshot**: Configured for development (adjust for production)
-
-### Traffic Flow
-
-In this project, the VPC acts as a private network container that holds all resources, including subnets, gateways, security controls, and compute instances. The public subnet is designed to host the Bastion host, which is the only instance directly accessible from the internet. This subnet has a route table that sends any traffic destined for the internet through the Internet Gateway (IGW), allowing secure communication from external networks to the Bastion. Security groups and network ACLs provide multiple layers of protection; the Bastion’s security group permits SSH access only from your specific IP address while allowing all outbound traffic, and the public NACL allows SSH and ephemeral ports inbound, while permitting all outbound connections.
-
-The private subnets, spread across two availability zones, host the RDS PostgreSQL database. These subnets do not have direct access to the internet. Instead, if any instance inside the private subnet needs to initiate outbound internet connections, the traffic is routed through a NAT Gateway located in the public subnet. The NAT Gateway forwards this traffic to the Internet Gateway while blocking inbound traffic from the internet, ensuring that the RDS database remains isolated from external access. The private route table contains a local route for internal VPC traffic and a default route pointing to the NAT Gateway, so the private instances can communicate internally and reach the internet safely for updates or patches. Security groups on the RDS database are configured to allow PostgreSQL traffic only from the Bastion host, while NACLs further restrict inbound traffic to only allow SSH and PostgreSQL from the public subnet and ephemeral ports for responses, ensuring strict control of network traffic.
-
-All internal VPC traffic, such as Bastion connecting to RDS, uses the local route in the private subnet route table. This ensures that traffic never leaves the VPC for communication between these resources. Multi-AZ deployment of RDS allows the database to replicate across private subnets for high availability, and all replication traffic remains internal to the VPC, never touching the NAT Gateway or IGW. This setup guarantees that private resources are protected, while the Bastion host acts as a controlled access point, balancing both security and functionality.
-
-The entire flow can be visualized as follows:
-
-```  
-[Your Laptop/PC]  
-|  
-| SSH 22  
-v  
-[Internet Gateway (IGW)]  
-|  
-v  
-[Public Subnet Route Table] → [Bastion Host (10.0.1.x)]  
-|  
-| TCP 5432 (PostgreSQL)  
-v  
-[Private Subnet Route Table] → [RDS Database (10.0.2.x / 10.0.3.x)]  
-|  
-| (Optional outbound)  
-v  
-[NAT Gateway in Public Subnet] → [Internet via IGW]  
-```
-
-
-
-In summary, the project architecture ensures that the Bastion host serves as the only entry point from the internet, while the RDS database remains in isolated private subnets with controlled access. Route tables, security groups, NACLs, and gateways work together to direct traffic appropriately, enforce security, and maintain the ability for private instances to communicate both internally and with the internet when necessary, achieving a balance of accessibility, isolation, and high availability.
-
 
 ## Prerequisites
 
@@ -133,7 +112,8 @@ ssh -i /path/to/your-key.pem ec2-user@<bastion-public-ip>
 
 ### 2. Install PostgreSQL Client (on Bastion)
 ```bash
-sudo dnf install -y postgresql15-server postgresql15
+sudo yum update -y
+sudo yum install postgresql15 -y
 ```
 
 ### 3. Connect to RDS
