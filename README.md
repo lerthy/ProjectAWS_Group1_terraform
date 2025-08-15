@@ -23,6 +23,26 @@ The infrastructure follows a secure, layered access pattern:
 - RDS SG: Database access only from Bastion security group
 - No direct internet access to private subnets or RDS instance
 
+- The entire flow can be visualized as follows:
+```bash
+[Your Laptop/PC]  
+|  
+| SSH 22  
+v  
+[Internet Gateway (IGW)]  
+|  
+v  
+[Public Subnet Route Table] → [Bastion Host (10.0.1.x)]  
+|  
+| TCP 5432 (PostgreSQL)  
+v  
+[Private Subnet Route Table] → [RDS Database (10.0.2.x / 10.0.3.x)]  
+|  
+| (Optional outbound)  
+v  
+[NAT Gateway in Public Subnet] → [Internet via IGW]  
+```
+
 ### Components
 
 - **VPC**: Custom VPC with DNS support and hostnames
