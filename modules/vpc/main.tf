@@ -117,42 +117,62 @@ resource "aws_network_acl" "public_nacl" {
     action     = "allow"
   }
 
-  # Allow outbound SSH responses 
+  # Allow outbound SSH to private subnets
   egress {
     rule_no    = 100
     protocol   = "tcp"
     from_port  = 22
     to_port    = 22
-    cidr_block = "0.0.0.0/0"
+    cidr_block = "10.0.0.0/16"
     action     = "allow"
   }
 
-  # Allow outbound ICMP
-  egress {
-    rule_no    = 105
-    protocol   = "icmp"
-    from_port  = 0
-    to_port    = 0
-    cidr_block = "0.0.0.0/0"
-    action     = "allow"
-  }
-
-  # Allow outbound ephemeral ports for SSH and other responses
+  # Allow outbound PostgreSQL to private subnets
   egress {
     rule_no    = 110
     protocol   = "tcp"
-    from_port  = 1024
-    to_port    = 65535
+    from_port  = 5432
+    to_port    = 5432
+    cidr_block = "10.0.0.0/16"
+    action     = "allow"
+  }
+
+  # Allow outbound HTTP for updates
+  egress {
+    rule_no    = 120
+    protocol   = "tcp"
+    from_port  = 80
+    to_port    = 80
     cidr_block = "0.0.0.0/0"
     action     = "allow"
   }
 
-  # Allow all other outbound traffic
+  # Allow outbound HTTPS for updates
   egress {
-    rule_no    = 120
-    protocol   = "-1"
-    from_port  = 0
-    to_port    = 0
+    rule_no    = 130
+    protocol   = "tcp"
+    from_port  = 443
+    to_port    = 443
+    cidr_block = "0.0.0.0/0"
+    action     = "allow"
+  }
+
+  # Allow outbound DNS
+  egress {
+    rule_no    = 140
+    protocol   = "udp"
+    from_port  = 53
+    to_port    = 53
+    cidr_block = "0.0.0.0/0"
+    action     = "allow"
+  }
+
+  # Allow ephemeral ports for responses
+  egress {
+    rule_no    = 150
+    protocol   = "tcp"
+    from_port  = 1024
+    to_port    = 65535
     cidr_block = "0.0.0.0/0"
     action     = "allow"
   }
@@ -195,12 +215,42 @@ resource "aws_network_acl" "private_nacl" {
     action     = "allow"
   }
 
-  # Allow all outbound
+  # Allow outbound responses to public subnet (ephemeral ports)
   egress {
     rule_no    = 100
-    protocol   = "-1"
-    from_port  = 0
-    to_port    = 0
+    protocol   = "tcp"
+    from_port  = 1024
+    to_port    = 65535
+    cidr_block = "10.0.1.0/24"
+    action     = "allow"
+  }
+
+  # Allow outbound HTTP for updates via NAT Gateway
+  egress {
+    rule_no    = 110
+    protocol   = "tcp"
+    from_port  = 80
+    to_port    = 80
+    cidr_block = "0.0.0.0/0"
+    action     = "allow"
+  }
+
+  # Allow outbound HTTPS for updates via NAT Gateway
+  egress {
+    rule_no    = 120
+    protocol   = "tcp"
+    from_port  = 443
+    to_port    = 443
+    cidr_block = "0.0.0.0/0"
+    action     = "allow"
+  }
+
+  # Allow outbound DNS via NAT Gateway
+  egress {
+    rule_no    = 130
+    protocol   = "udp"
+    from_port  = 53
+    to_port    = 53
     cidr_block = "0.0.0.0/0"
     action     = "allow"
   }

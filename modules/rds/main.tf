@@ -9,12 +9,8 @@ resource "aws_security_group" "rds_sg" {
     security_groups = [var.bastion_sg_id]
   }
 
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  # RDS instances typically don't need outbound connections
+  # Remove overly permissive egress rule - RDS should only respond to connections
 }
 
 resource "aws_db_subnet_group" "rds_subnet_group" {
